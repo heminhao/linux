@@ -52,12 +52,26 @@ jobs:
       - name: Configure kernel
         run: |
           make O=build ARCH=x86_64 defconfig
+
+          scripts/config --file build/.config \
+            -e MODULES \
+            -m NTFS3_FS \
+            -e NTFS3_LZX_XPRESS \
+            -e NTFS3_FS_POSIX_ACL
+
           make O=build ARCH=x86_64 olddefconfig
 
-      - name: Build kernel
+          # 确认 NTFS3 被配置为模块
+          grep -q '^CONFIG_NTFS3_FS=m$' build/.config
+
+      - name: Build kernel and NTFS3
         run: |
           make O=build ARCH=x86_64 \
-            -j"$(nproc)" bzImage
+            -j"$(nproc)" bzImage modules
+
+          # 确认模块确实生成
+          test -f build/fs/ntfs3/ntfs3.ko
+          ls -lh build/fs/ntfs3/ntfs3.ko
 
       - name: Show build information
         run: |
@@ -69,6 +83,7 @@ jobs:
         run: |
           mkdir -p artifacts
           cp build/arch/x86/boot/bzImage artifacts/
+          cp build/fs/ntfs3/ntfs3.ko artifacts/
           cp build/.config artifacts/config
           make O=build ARCH=x86_64 \
             kernelrelease > artifacts/kernel-version.txt
