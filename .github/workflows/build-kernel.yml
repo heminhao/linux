@@ -1,0 +1,82 @@
+
+name: Build Linux Kernel
+
+on:
+  workflow_dispatch:
+
+  # 以后需要每次 push 自动编译时，取消下面注释
+  # push:
+  #   branches:
+  #     - master
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build x86_64 Kernel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+
+    steps:
+      - name: Checkout kernel source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Free disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/hostedtoolcache
+          df -h
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            dwarves \
+            cpio \
+            kmod \
+            rsync \
+            python3 \
+            pkg-config
+
+      - name: Configure kernel
+        run: |
+          make O=build ARCH=x86_64 defconfig
+          make O=build ARCH=x86_64 olddefconfig
+
+      - name: Build kernel
+        run: |
+          make O=build ARCH=x86_64 \
+            -j"$(nproc)" bzImage
+
+      - name: Show build information
+        run: |
+          make O=build ARCH=x86_64 kernelrelease
+          ls -lh build/arch/x86/boot/bzImage
+          df -h
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp build/arch/x86/boot/bzImage artifacts/
+          cp build/.config artifacts/config
+          make O=build ARCH=x86_64 \
+            kernelrelease > artifacts/kernel-version.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: artifacts/
+          retention-days: 7
+          if-no-files-found: error
