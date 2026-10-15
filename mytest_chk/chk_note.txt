@@ -1,3 +1,5 @@
 
 https://syzkaller.appspot.com/upstream
 
+https://lore.kernel.org/lkml/
+
